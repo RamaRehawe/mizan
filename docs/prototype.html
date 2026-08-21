@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger — close session prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#E7EAEE;
+  --paper:#FFFFFF;
+  --ink:#13171C;
+  --ink2:#4A525C;
+  --ink3:#828C97;
+  --rule:#D5DAE0;
+  --rule2:#EBEEF1;
+  --blue:#1C4E80;
+  --blue-wash:#E8EFF6;
+  --brass:#8C6D30;
+  --brass-wash:#F5EFE2;
+  --out:#9E3527;
+  --in:#20624A;
+  --warn:#8A6A12;
+  --warn-wash:#FBF3DC;
+  --r:3px;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.neg{color:var(--out)}
+.pos{color:var(--in)}
+.mut{color:var(--ink3)}
+.lbl{
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+}
+a{color:var(--blue)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* ── shell ─────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:246px 1fr;min-height:100vh}
+
+/* ── ritual rail (the signature) ────────────────── */
+.rail{
+  background:#11161C;color:#C9D1DA;padding:20px 0 28px;
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+}
+.rail-head{padding:0 20px 20px;border-bottom:1px solid #232C36}
+.mark{display:flex;align-items:baseline;gap:8px}
+.mark strong{font-size:15px;font-weight:600;letter-spacing:-.01em;color:#F2F5F8}
+.mark span{font-family:var(--mono);font-size:10px;color:#5E6B79;letter-spacing:.1em}
+.period{
+  margin-top:14px;display:flex;align-items:center;justify-content:space-between;
+  background:#1A222B;border:1px solid #2A343F;border-radius:var(--r);padding:7px 10px;
+}
+.period .p-m{font-family:var(--mono);font-size:13px;color:#EAF0F5;letter-spacing:.04em}
+.period .p-s{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#D8A93B}
+
+.spine{padding:18px 0 0;flex:1;overflow-y:auto}
+.spine-title{padding:0 20px 12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#5E6B79}
+.step{
+  display:grid;grid-template-columns:34px 1fr auto;align-items:center;
+  width:100%;background:none;border:0;color:#A9B4C0;text-align:left;
+  padding:9px 16px 9px 0;position:relative;font-size:13px;
+}
+.step:hover{color:#EAF0F5}
+.step .dot{
+  position:relative;justify-self:center;width:9px;height:9px;border-radius:50%;
+  background:#11161C;border:1.5px solid #3A4652;z-index:2;
+}
+.step::before{
+  content:"";position:absolute;left:17px;top:0;bottom:0;width:1px;background:#242D37;z-index:1;
+}
+.step:first-of-type::before{top:50%}
+.step:last-of-type::before{bottom:50%}
+.step.done .dot{background:#3E7D5E;border-color:#3E7D5E}
+.step.done .stepname{color:#7E8B98}
+.step.active{color:#F2F5F8}
+.step.active .dot{background:#D8A93B;border-color:#D8A93B;box-shadow:0 0 0 3px rgba(216,169,59,.16)}
+.step.blocked .dot{border-color:#8A4436}
+.stepname{font-size:13px}
+.count{
+  font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:2px;
+  background:#232C36;color:#93A0AD;margin-right:16px;
+}
+.count.hot{background:#3B2420;color:#D98C7A}
+.count.ok{background:#1E2E27;color:#63A184}
+.rail-foot{padding:16px 20px 0;border-top:1px solid #232C36;margin-top:8px}
+.freshline{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:#6D7885;padding:3px 0}
+.freshline b{font-weight:500;color:#A9B4C0}
+.freshline.stale b{color:#D98C7A}
+
+/* ── main ──────────────────────────────────────── */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  background:var(--paper);border-bottom:1px solid var(--rule);
+  padding:0 26px;display:flex;align-items:center;gap:2px;position:sticky;top:0;z-index:20;
+}
+.tab{
+  background:none;border:0;padding:15px 13px 13px;color:var(--ink2);
+  border-bottom:2px solid transparent;font-size:13.5px;font-weight:500;
+}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blue)}
+.tab .badge{
+  font-family:var(--mono);font-size:10px;background:var(--out);color:#fff;
+  border-radius:8px;padding:1px 5px;margin-left:6px;vertical-align:1px;
+}
+.topbar .spacer{flex:1}
+.cur{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.06em}
+
+.view{padding:24px 26px 60px;max-width:1180px}
+.view[hidden]{display:none}
+.vhead{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;gap:20px}
+h1{font-size:21px;font-weight:600;letter-spacing:-.015em;margin:0 0 3px}
+.sub{color:var(--ink2);font-size:13px;margin:0;max-width:62ch}
+
+/* cards */
+.card{background:var(--paper);border:1px solid var(--rule);border-radius:var(--r)}
+.card-h{
+  padding:11px 14px;border-bottom:1px solid var(--rule2);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.card-b{padding:14px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:1fr 1fr}
+.g23{grid-template-columns:1.55fr 1fr}
+
+/* figure block */
+.fig .v{font-family:var(--mono);font-size:27px;font-weight:500;letter-spacing:-.02em;line-height:1.15}
+.fig .v small{font-size:13px;color:var(--ink3);font-weight:400;margin-left:3px}
+.fig .d{font-family:var(--mono);font-size:11.5px;margin-top:5px}
+.bar{height:5px;background:var(--rule2);border-radius:2px;overflow:hidden;margin-top:11px;display:flex}
+.bar i{display:block;height:100%}
+
+/* tables */
+table{width:100%;border-collapse:collapse}
+th{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink3);font-weight:500;text-align:left;padding:8px 12px;
+  border-bottom:1px solid var(--rule);white-space:nowrap;
+}
+td{padding:8px 12px;border-bottom:1px solid var(--rule2);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.r{text-align:right}
+tbody tr:hover{background:#F7F9FA}
+.tname{font-weight:500}
+.tsub{font-size:11.5px;color:var(--ink3)}
+
+/* chips */
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:2px;
+  background:var(--rule2);color:var(--ink2);white-space:nowrap;
+}
+.chip.blue{background:var(--blue-wash);color:var(--blue)}
+.chip.brass{background:var(--brass-wash);color:var(--brass)}
+.chip.warn{background:var(--warn-wash);color:var(--warn)}
+.chip.bad{background:#FAECE9;color:var(--out)}
+.chip.good{background:#E9F2ED;color:var(--in)}
+
+/* buttons */
+.btn{
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+  padding:6px 12px;border-radius:var(--r);font-size:13px;font-weight:500;
+}
+.btn:hover{border-color:var(--ink3)}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:#173F68}
+.btn.pri[disabled]{background:var(--rule);border-color:var(--rule);color:var(--ink3);cursor:not-allowed}
+.btn.sm{padding:3px 9px;font-size:12px}
+.btn.ghost{background:none;border-color:transparent;color:var(--blue)}
+
+.note{
+  border-left:2px solid var(--warn);background:var(--warn-wash);
+  padding:9px 12px;font-size:12.5px;color:#5E4A0E;border-radius:0 var(--r) var(--r) 0;
+}
+.note.bad{border-color:var(--out);background:#FAECE9;color:#7A2A1F}
+.note.info{border-color:var(--blue);background:var(--blue-wash);color:#173F68}
+
+/* review queue */
+.qwrap{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start}
+.focus{border:1px solid var(--rule);border-radius:var(--r);background:var(--paper);overflow:hidden}
+.focus-top{padding:16px 18px;border-bottom:1px solid var(--rule2)}
+.focus-desc{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.focus-amt{font-family:var(--mono);font-size:24px;font-weight:500;letter-spacing:-.02em}
+.focus-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;color:var(--ink2)}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:14px 18px}
+.opt{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--rule);
+  border-radius:var(--r);background:var(--paper);text-align:left;font-size:13px;
+}
+.opt:hover{border-color:var(--blue);background:var(--blue-wash)}
+.key{
+  font-family:var(--mono);font-size:10px;min-width:17px;height:17px;display:grid;place-items:center;
+  border:1px solid var(--rule);border-radius:2px;color:var(--ink3);background:#FAFBFC;
+}
+.keybar{
+  padding:9px 18px;border-top:1px solid var(--rule2);background:#FAFBFC;
+  display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--ink3);
+}
+.keybar b{font-family:var(--mono);color:var(--ink2);font-weight:500}
+.qlist{max-height:520px;overflow:auto}
+.qitem{
+  width:100%;display:block;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--rule2);padding:9px 12px;
+}
+.qitem:hover{background:#F7F9FA}
+.qitem.cur{background:var(--blue-wash);box-shadow:inset 2px 0 0 var(--blue)}
+.qitem.done{opacity:.42}
+.qtop{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.qdesc{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* reconcile */
+.recon-row{display:grid;grid-template-columns:1fr auto auto auto auto;gap:14px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--rule2)}
+.recon-row:last-child{border-bottom:0}
+.inp{
+  font-family:var(--mono);font-size:13px;border:1px solid var(--rule);border-radius:var(--r);
+  padding:5px 8px;width:118px;text-align:right;background:var(--paper);color:var(--ink);
+}
+.inp:focus{border-color:var(--blue);outline:none}
+
+/* trend cells */
+.spark{display:flex;align-items:flex-end;gap:1.5px;height:20px}
+.spark i{width:5px;background:var(--rule);border-radius:1px 1px 0 0}
+.spark i.hi{background:var(--blue)}
+
+/* goals */
+.goal{border:1px solid var(--rule);border-radius:var(--r);background:var(--paper);margin-bottom:12px}
+.goal-h{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--rule2)}
+.rank{font-family:var(--mono);font-size:11px;color:var(--ink3);width:18px}
+.goal-n{font-weight:600;font-size:14.5px;letter-spacing:-.01em}
+.goal-b{padding:13px 15px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.mini .lbl{margin-bottom:3px;display:block}
+.mini .mv{font-family:var(--mono);font-size:15px;font-weight:500}
+.slider{width:100%;accent-color:var(--blue)}
+
+.sep{height:1px;background:var(--rule);margin:26px 0 22px}
+.stack>*+*{margin-top:14px}
+.rowbtwn{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.flexg{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ── guided tour ── */
+.spot{
+  position:relative;z-index:900;border-radius:5px;
+  box-shadow:0 0 0 9999px rgba(11,15,20,.62), 0 0 0 3px #D8A93B;
+}
+.rail.spot{border-radius:0}
+#tour{
+  position:fixed;right:26px;bottom:26px;width:352px;z-index:1000;
+  background:var(--paper);border:1px solid var(--rule);border-radius:5px;
+  box-shadow:0 18px 44px rgba(11,15,20,.34);overflow:hidden;
+}
+#tour[hidden]{display:none}
+#tour .t-h{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--rule2)}
+#tour .t-b{padding:15px}
+#tour h3{margin:0 0 6px;font-size:15.5px;font-weight:600;letter-spacing:-.01em}
+#tour p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.5}
+#tour .t-f{display:flex;align-items:center;gap:8px;padding:11px 15px;border-top:1px solid var(--rule2);background:#FAFBFC}
+#tour .t-f .sp{flex:1}
+.dots{display:flex;gap:4px}
+.dots i{width:5px;height:5px;border-radius:50%;background:var(--rule);display:block}
+.dots i.on{background:var(--blue)}
+.tclose{background:none;border:0;color:var(--ink3);font-size:17px;line-height:1;padding:2px 4px}
+@media (max-width:1000px){#tour{left:14px;right:14px;width:auto;bottom:14px}}
+
+@media (prefers-reduced-motion:no-preference){
+  .view{animation:fade .18s ease-out}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+}
+@media (max-width:1000px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto}
+  .g3,.g2,.g23,.qwrap,.goal-b,.opts{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══ RITUAL RAIL ══════════════════════════════ -->
+<aside class="rail" id="railEl">
+  <div class="rail-head">
+    <div class="mark"><strong>Ledger</strong><span>LOCAL</span></div>
+    <div class="period">
+      <span class="p-m">2026 · JUL</span>
+      <span class="p-s">open</span>
+    </div>
+  </div>
+
+  <nav class="spine" aria-label="Close session">
+    <div class="spine-title">Close session</div>
+
+    <button class="step done" data-go="import">
+      <span class="dot"></span><span class="stepname">Import files</span>
+      <span class="count ok">4 files</span>
+    </button>
+    <button class="step active blocked" data-go="review">
+      <span class="dot"></span><span class="stepname">Clear review queue</span>
+      <span class="count hot" id="railQueue">14</span>
+    </button>
+    <button class="step blocked" data-go="reconcile">
+      <span class="dot"></span><span class="stepname">Reconcile accounts</span>
+      <span class="count hot">2 off</span>
+    </button>
+    <button class="step" data-go="assets">
+      <span class="dot"></span><span class="stepname">Refresh prices</span>
+      <span class="count">1 stale</span>
+    </button>
+    <button class="step" data-go="close">
+      <span class="dot"></span><span class="stepname">Freeze snapshot</span>
+      <span class="count">—</span>
+    </button>
+    <button class="step" data-go="reports">
+      <span class="dot"></span><span class="stepname">Read the month</span>
+      <span class="count">—</span>
+    </button>
+    <button class="step" data-go="goals">
+      <span class="dot"></span><span class="stepname">Update plan</span>
+      <span class="count">4 goals</span>
+    </button>
+  </nav>
+
+  <div class="rail-foot">
+    <div class="freshline"><span>Last import</span><b>2 days ago</b></div>
+    <div class="freshline"><span>Gold price</span><b>1 day ago</b></div>
+    <div class="freshline stale"><span>Holdings price</span><b>10 days ago</b></div>
+    <div class="freshline"><span>Backup</span><b>today 09:12</b></div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ═════════════════════════════════════ -->
+<div class="main">
+  <div class="topbar" role="tablist">
+    <button class="tab" role="tab" data-go="close" aria-selected="true">Close</button>
+    <button class="tab" role="tab" data-go="import">Import</button>
+    <button class="tab" role="tab" data-go="review">Review<span class="badge" id="tabQueue">14</span></button>
+    <button class="tab" role="tab" data-go="reconcile">Reconcile</button>
+    <button class="tab" role="tab" data-go="assets">Assets</button>
+    <button class="tab" role="tab" data-go="reports">Reports</button>
+    <button class="tab" role="tab" data-go="goals">Plan</button>
+    <button class="tab" role="tab" data-go="ledger">Ledger</button>
+    <span class="spacer"></span>
+    <button class="btn sm" id="tourBtn" style="margin-right:12px">Guided tour</button>
+    <span class="cur">BASE AED</span>
+  </div>
+
+<!-- ── CLOSE ─────────────────────────────────── -->
+<section class="view" id="v-close">
+  <div class="vhead">
+    <div>
+      <h1>July 2026</h1>
+      <p class="sub">Three steps left before this month can be frozen. Everything below is provisional until then.</p>
+    </div>
+    <button class="btn pri" disabled>Freeze July · 3 blockers</button>
+  </div>
+
+  <div class="grid g3">
+    <div class="card fig" id="nwCard"><div class="card-b">
+      <span class="lbl">Net worth</span>
+      <div class="v num">197,315<small>AED</small></div>
+      <div class="d pos">+9,380 &nbsp;<span class="mut">vs June · +5.0%</span></div>
+      <div class="bar" title="by asset class">
+        <i style="width:42%;background:var(--blue)"></i>
+        <i style="width:34%;background:var(--in)"></i>
+        <i style="width:39%;background:var(--brass)"></i>
+        <i style="width:-15%"></i>
+      </div>
+      <div class="flexg" style="margin-top:9px">
+        <span class="chip blue">cash 42%</span>
+        <span class="chip good">invest 34%</span>
+        <span class="chip brass">gold 39%</span>
+        <span class="chip bad">debt −15%</span>
+      </div>
+    </div></div>
+
+    <div class="card fig" id="runwayCard"><div class="card-b">
+      <span class="lbl">Emergency runway</span>
+      <div class="v num">7.4<small>months</small></div>
+      <div class="d mut">83,400 liquid ÷ 11,240 essential / mo</div>
+      <div class="bar"><i style="width:74%;background:var(--in)"></i></div>
+      <div class="mut" style="font-size:11.5px;margin-top:9px">Target 10 months · 2.6 to go</div>
+    </div></div>
+
+    <div class="card fig"><div class="card-b">
+      <span class="lbl">Savings rate</span>
+      <div class="v num">34.1<small>%</small></div>
+      <div class="d mut">9,380 kept of 27,500 earned</div>
+      <div class="bar"><i style="width:34%;background:var(--blue)"></i></div>
+      <div class="mut" style="font-size:11.5px;margin-top:9px">12-mo rolling 29.6% · best month 41%</div>
+    </div></div>
+  </div>
+
+  <div class="grid g23" style="margin-top:14px">
+    <div class="card">
+      <div class="card-h"><span class="lbl">Accounts</span><span class="lbl">Reconciled through</span></div>
+      <table>
+        <tbody>
+          <tr><td class="tname">Bank — Current<div class="tsub">immediate</div></td><td class="r num">42,180</td><td class="r"><span class="chip good">31 Jul</span></td></tr>
+          <tr><td class="tname">Bank — Savings<div class="tsub">short term · emergency bucket 60,000</div></td><td class="r num">38,000</td><td class="r"><span class="chip good">31 Jul</span></td></tr>
+          <tr><td class="tname">Cash on hand<div class="tsub">immediate · needs a count</div></td><td class="r num">3,220</td><td class="r"><span class="chip warn">30 Jun</span></td></tr>
+          <tr><td class="tname">Card — Visa<div class="tsub">debt · delta 340</div></td><td class="r num neg">−6,480</td><td class="r"><span class="chip bad">off</span></td></tr>
+          <tr><td class="tname">Broker — USD<div class="tsub">illiquid · $18,240 @ 3.6725</div></td><td class="r num">67,010</td><td class="r"><span class="chip warn">price 10d</span></td></tr>
+          <tr><td class="tname">Gold — 22k<div class="tsub">illiquid · 210.0 g</div></td><td class="r num">77,385</td><td class="r"><span class="chip good">1 Aug</span></td></tr>
+          <tr><td class="tname">Car loan<div class="tsub">debt · 12 instalments left</div></td><td class="r num neg">−24,000</td><td class="r"><span class="chip good">31 Jul</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack" id="alerts">
+      <div class="note bad"><b>Card — Visa is off by 340.</b> Computed 6,140, statement says 6,480. Likely a missing row near 28 Jul. <a href="#" data-go="reconcile">Open reconcile</a></div>
+      <div class="note"><b>Holdings priced 10 days ago.</b> Net worth uses the 31 Jul price. <a href="#" data-go="assets">Enter today's price</a></div>
+      <div class="note info"><b>Cash last counted 30 Jun.</b> Count your wallet and let the difference land as cash drift.</div>
+      <div class="card"><div class="card-h"><span class="lbl">Next 90 days committed</span></div>
+        <table><tbody>
+          <tr><td>Rent — quarterly<div class="tsub">1 Oct</div></td><td class="r num">18,000</td></tr>
+          <tr><td>Car loan × 3<div class="tsub">monthly</div></td><td class="r num">6,000</td></tr>
+          <tr><td>Health insurance<div class="tsub">12 Sep</div></td><td class="r num">3,200</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── IMPORT ────────────────────────────────── -->
+<section class="view" id="v-import" hidden>
+  <div class="vhead">
+    <div><h1>Import</h1><p class="sub">Nothing is committed until you accept the preview. Re-uploading an overlapping file is safe — matching rows are skipped, not duplicated.</p></div>
+    <button class="btn">Add file</button>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-h">
+      <div class="flexg"><span class="tname">ENBD_statement_2026-07.xlsx</span><span class="chip">sha 4f2a…c081</span><span class="chip blue">profile: ENBD current</span></div>
+      <span class="lbl">staged · not committed</span>
+    </div>
+    <div class="card-b">
+      <div class="grid g3" style="margin-bottom:14px" id="importSummary">
+        <div class="fig"><span class="lbl">Rows read</span><div class="v num" style="font-size:20px">214</div></div>
+        <div class="fig"><span class="lbl">New transactions</span><div class="v num pos" style="font-size:20px">198</div></div>
+        <div class="fig"><span class="lbl">Already present</span><div class="v num mut" style="font-size:20px">14</div></div>
+      </div>
+      <div class="note bad" style="margin-bottom:12px"><b>2 rows can't be parsed.</b> Both have an empty date cell. They'll be held in quarantine — fix them there, no need to re-upload.</div>
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th class="r">Amount</th><th>Status</th><th>Auto-classified</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2026-07-02</td><td>SALARY TRANSFER REF 88213</td><td class="r num pos">+27,500</td><td><span class="chip good">new</span></td><td><span class="chip blue">Income · Salary</span></td></tr>
+          <tr><td class="num">2026-07-03</td><td>CARREFOUR MALL OF EMIR</td><td class="r num neg">−412.60</td><td><span class="chip good">new</span></td><td><span class="chip blue">Groceries</span></td></tr>
+          <tr><td class="num">2026-07-05</td><td>TRF TO 0290**** SAVINGS</td><td class="r num neg">−8,000</td><td><span class="chip good">new</span></td><td><span class="chip">transfer candidate</span></td></tr>
+          <tr><td class="num">2026-07-05</td><td>DEWA 20240519</td><td class="r num neg">−618.40</td><td><span class="chip good">new</span></td><td><span class="chip blue">Utilities</span></td></tr>
+          <tr><td class="num">2026-07-07</td><td>POS 44190 AL BARSHA</td><td class="r num neg">−96.00</td><td><span class="chip good">new</span></td><td><span class="chip warn">unmatched</span></td></tr>
+          <tr class="mut"><td class="num">2026-07-08</td><td>SALIK RECHARGE</td><td class="r num neg">−100.00</td><td><span class="chip">duplicate</span></td><td>—</td></tr>
+          <tr><td class="num" colspan="5" style="color:var(--ink3);font-family:var(--sans)">…208 more rows</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-h" style="border-top:1px solid var(--rule2);border-bottom:0" id="commitBar">
+      <span class="mut" style="font-size:12.5px">A backup is taken automatically before commit.</span>
+      <div class="flexg"><button class="btn">Discard</button><button class="btn pri">Commit 198 transactions</button></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><span class="lbl">Source profiles</span><button class="btn sm">New profile</button></div>
+      <table><tbody>
+        <tr><td class="tname">ENBD current<div class="tsub">sheet 1 · header row 12 · debit/credit columns · DD/MM/YYYY</div></td><td class="r"><span class="chip good">ok</span></td></tr>
+        <tr><td class="tname">Visa card<div class="tsub">CSV · signed amount · sign flipped</div></td><td class="r"><span class="chip good">ok</span></td></tr>
+        <tr><td class="tname">Broker statement<div class="tsub">3 sheets · cash ops + closed positions</div></td><td class="r"><span class="chip good">ok</span></td></tr>
+        <tr><td class="tname">Manual sheet<div class="tsub">built-in template · cash spending</div></td><td class="r"><span class="chip">built-in</span></td></tr>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="lbl">Recent batches</span></div>
+      <table><tbody>
+        <tr><td>Visa_2026-07.csv<div class="tsub">8 Aug · 96 rows · 91 new</div></td><td class="r"><span class="chip good">committed</span></td></tr>
+        <tr><td>Broker_Q2.xlsx<div class="tsub">8 Aug · 41 rows · 41 new</div></td><td class="r"><span class="chip good">committed</span></td></tr>
+        <tr><td>ENBD_2026-06.xlsx<div class="tsub">4 Jul · 201 rows · 0 new</div></td><td class="r"><span class="chip">no-op</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ── REVIEW ────────────────────────────────── -->
+<section class="view" id="v-review" hidden>
+  <div class="vhead">
+    <div><h1>Review queue</h1><p class="sub">Ordered by amount, so a short session still resolves most of the money. Keyboard only — you shouldn't need the mouse.</p></div>
+    <div class="flexg" id="qProgress"></div>
+  </div>
+
+  <div class="qwrap">
+    <div>
+      <div class="focus" id="focusCard"></div>
+      <div class="keybar" id="keybar">
+        <span><b>J / K</b> move</span><span><b>1–6</b> assign category</span><span><b>T</b> link as transfer</span>
+        <span><b>S</b> split</span><span><b>R</b> make a rule</span><span><b>U</b> skip</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="lbl">Queue</span><span class="lbl" id="qCount">14 left</span></div>
+      <div class="qlist" id="qList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── RECONCILE ─────────────────────────────── -->
+<section class="view" id="v-reconcile" hidden>
+  <div class="vhead">
+    <div><h1>Reconcile</h1><p class="sub">Type the closing balance printed on each statement. Anything that doesn't match is either a missing transaction or a recorded adjustment — never silently absorbed.</p></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px" id="reconCard">
+    <div class="card-h"><span class="lbl">31 July 2026</span><span class="lbl">Computed · Statement · Delta</span></div>
+    <div class="recon-row">
+      <div><span class="tname">Bank — Current</span><div class="tsub">198 transactions this month</div></div>
+      <span class="num mut">42,180.00</span>
+      <input class="inp" value="42,180.00" aria-label="Statement balance">
+      <span class="num pos">0.00</span>
+      <span class="chip good">matched</span>
+    </div>
+    <div class="recon-row">
+      <div><span class="tname">Bank — Savings</span><div class="tsub">6 transactions this month</div></div>
+      <span class="num mut">38,000.00</span>
+      <input class="inp" value="38,000.00" aria-label="Statement balance">
+      <span class="num pos">0.00</span>
+      <span class="chip good">matched</span>
+    </div>
+    <div class="recon-row" style="background:#FEF9F8">
+      <div><span class="tname">Card — Visa</span><div class="tsub">91 transactions this month</div></div>
+      <span class="num mut">6,140.00</span>
+      <input class="inp" value="6,480.00" aria-label="Statement balance">
+      <span class="num neg">−340.00</span>
+      <span class="chip bad">off</span>
+    </div>
+    <div class="recon-row">
+      <div><span class="tname">Cash on hand</span><div class="tsub">last counted 30 Jun</div></div>
+      <span class="num mut">3,220.00</span>
+      <input class="inp" placeholder="count it" aria-label="Counted cash">
+      <span class="num mut">—</span>
+      <span class="chip warn">not counted</span>
+    </div>
+  </div>
+
+  <div class="card" id="resolveCard">
+    <div class="card-h"><span class="lbl">Resolving Card — Visa · −340.00</span><button class="btn sm">Record as adjustment</button></div>
+    <div class="card-b">
+      <div class="note info" style="margin-bottom:12px">One statement row near 28 Jul has no matching transaction. The card export may have been cut short — check the date range you downloaded before recording an adjustment.</div>
+      <table>
+        <thead><tr><th>Candidate</th><th>Date</th><th class="r">Amount</th><th class="r">Action</th></tr></thead>
+        <tbody>
+          <tr><td>Statement row not in ledger<div class="tsub">TALABAT ORDER 771902</div></td><td class="num">2026-07-28</td><td class="r num neg">−340.00</td><td class="r"><button class="btn sm pri">Add this</button></td></tr>
+          <tr><td>Quarantined row<div class="tsub">empty date cell · from Visa_2026-07.csv</div></td><td class="num mut">—</td><td class="r num neg">−340.00</td><td class="r"><button class="btn sm">Fix date</button></td></tr>
+          <tr><td>Unexplained difference<div class="tsub">records an adjustment, stays visible in reports</div></td><td class="num mut">—</td><td class="r num neg">−340.00</td><td class="r"><button class="btn sm">Record</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── ASSETS ────────────────────────────────── -->
+<section class="view" id="v-assets" hidden>
+  <div class="vhead">
+    <div><h1>Assets &amp; prices</h1><p class="sub">Quantities are the record. Values are always derived from a dated price, so July's net worth never changes when today's gold price does.</p></div>
+    <button class="btn">Add holding</button>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" id="holdingsCard">
+      <div class="card-h"><span class="lbl">Holdings</span></div>
+      <table>
+        <thead><tr><th>Asset</th><th class="r">Quantity</th><th class="r">Unit price</th><th class="r">Value AED</th><th class="r">Unrealised</th></tr></thead>
+        <tbody>
+          <tr><td class="tname">Gold 22k<div class="tsub">physical · purity 0.9167</div></td><td class="r num">210.00 g</td><td class="r num">368.50</td><td class="r num">77,385</td><td class="r num pos">+11,240</td></tr>
+          <tr><td class="tname">VOO<div class="tsub">ETF · broker USD</div></td><td class="r num">24.0</td><td class="r num">$612.40</td><td class="r num">53,984</td><td class="r num pos">+6,110</td></tr>
+          <tr><td class="tname">Cash — USD<div class="tsub">broker balance</div></td><td class="r num">$3,548</td><td class="r num">3.6725</td><td class="r num">13,026</td><td class="r num mut">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="lbl">Prices</span><button class="btn sm">Enter price</button></div>
+      <table>
+        <thead><tr><th>Asset</th><th class="r">Price</th><th>As of</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Gold 24k / gram</td><td class="r num">402.00</td><td class="num">2026-08-09</td><td><span class="chip">manual</span></td></tr>
+          <tr style="background:#FEFBF2"><td>VOO</td><td class="r num">$612.40</td><td class="num">2026-07-31</td><td><span class="chip warn">10 days old</span></td></tr>
+          <tr><td>USD → AED</td><td class="r num">3.6725</td><td class="num">2026-08-09</td><td><span class="chip">manual</span></td></tr>
+        </tbody>
+      </table>
+      <div class="card-b" style="border-top:1px solid var(--rule2)">
+        <span class="lbl">Buy / sell</span>
+        <div class="flexg" style="margin-top:9px">
+          <input class="inp" style="width:86px;text-align:left" placeholder="Gold 22k">
+          <input class="inp" style="width:74px" placeholder="+ grams">
+          <input class="inp" style="width:92px" placeholder="unit cost">
+          <button class="btn sm pri">Record</button>
+        </div>
+        <div class="tsub" style="margin-top:9px">Quantity becomes the sum of every movement. Cost basis is weighted average.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+  <div class="card">
+    <div class="card-h"><span class="lbl">Net worth · frozen snapshots</span><span class="lbl">12 months</span></div>
+    <div class="card-b">
+      <div class="spark" style="height:88px;gap:9px;align-items:flex-end" id="nwSpark"></div>
+      <div class="flexg" style="margin-top:12px">
+        <span class="chip">Aug 2025 · 142,900</span>
+        <span class="chip">Jan 2026 · 168,400</span>
+        <span class="chip blue">Jul 2026 · 197,315</span>
+      </div>
+      <div class="note info" style="margin-top:14px"><b>July change: +9,380.</b> Net savings +8,120 · gold price movement +1,940 · FX −340 · unexplained −340. The last line is the card delta and disappears once you reconcile.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── REPORTS ───────────────────────────────── -->
+<section class="view" id="v-reports" hidden>
+  <div class="vhead">
+    <div><h1>July 2026 report</h1><p class="sub">Every figure drills through to the transactions behind it. Transfers and investment purchases are excluded from spending.</p></div>
+    <div class="flexg"><button class="btn sm">Export CSV</button><button class="btn sm">12-month view</button></div>
+  </div>
+
+  <div class="grid g3" style="margin-bottom:14px">
+    <div class="card fig"><div class="card-b"><span class="lbl">Income</span><div class="v num pos">27,500</div><div class="d mut">1 source · 100% concentration</div></div></div>
+    <div class="card fig"><div class="card-b"><span class="lbl">Spending</span><div class="v num neg">18,120</div><div class="d mut">11,240 essential · 6,880 discretionary</div></div></div>
+    <div class="card fig"><div class="card-b"><span class="lbl">Kept</span><div class="v num">9,380</div><div class="d mut">8,000 to savings · 1,380 left in current</div></div></div>
+  </div>
+
+  <div class="grid g23">
+    <div class="card" id="catCard">
+      <div class="card-h"><span class="lbl">By category</span><span class="lbl">Jul · vs 3-mo avg · 6-mo trend</span></div>
+      <table>
+        <thead><tr><th>Category</th><th class="r">July</th><th class="r">3-mo avg</th><th>Trend</th><th class="r">Share</th></tr></thead>
+        <tbody id="catRows"></tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="card"><div class="card-h"><span class="lbl">Flagged this month</span></div>
+        <table><tbody>
+          <tr><td>Travel <span class="chip bad">3.4× avg</span><div class="tsub">flights booked 14 Jul</div></td><td class="r num">3,900</td></tr>
+          <tr><td>Dining <span class="chip warn">+22%</span><div class="tsub">31 transactions</div></td><td class="r num">1,480</td></tr>
+          <tr><td>New merchant<div class="tsub">first seen 19 Jul</div></td><td class="r num">760</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card"><div class="card-h"><span class="lbl">Recurring detected</span><span class="lbl">annualised</span></div>
+        <table><tbody>
+          <tr><td>Streaming ×3<div class="tsub">monthly · stable</div></td><td class="r num">1,620</td></tr>
+          <tr><td>Cloud storage<div class="tsub">monthly · price rose 12% in May</div></td><td class="r num">468</td></tr>
+          <tr><td>Gym<div class="tsub">annual · renews Feb</div></td><td class="r num">2,400</td></tr>
+          <tr><td class="mut">Music app<div class="tsub">not seen since April — cancelled?</div></td><td class="r num mut">—</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── GOALS ─────────────────────────────────── -->
+<section class="view" id="v-goals" hidden>
+  <div class="vhead">
+    <div><h1>Plan</h1><p class="sub">Goals are ranked against each other, and every one shows what buying it does to your runway. Drag to reorder.</p></div>
+    <button class="btn">Add goal</button>
+  </div>
+
+  <div class="note info" style="margin-bottom:16px">Working from a trailing surplus of <b class="num">9,380</b> / month and <b class="num">83,400</b> liquid. Change the assumption in <a href="#">forecast settings</a>.</div>
+
+  <div id="goalList"></div>
+
+  <div class="sep"></div>
+  <div class="card" id="simCard">
+    <div class="card-h"><span class="lbl">Simulate</span><span class="lbl">what a purchase does today</span></div>
+    <div class="card-b">
+      <div class="rowbtwn" style="margin-bottom:10px">
+        <span>Spend now</span>
+        <span class="num" id="simAmt" style="font-size:17px;font-weight:500">30,000</span>
+      </div>
+      <input class="slider" type="range" min="0" max="83400" step="500" value="30000" id="sim" aria-label="Amount to spend">
+      <div class="grid g3" style="margin-top:16px">
+        <div class="mini"><span class="lbl">Liquid after</span><div class="mv num" id="simLiq">53,400</div></div>
+        <div class="mini"><span class="lbl">Runway after</span><div class="mv num" id="simRun">4.8 months</div></div>
+        <div class="mini"><span class="lbl">Back to 7.4 months</span><div class="mv num" id="simBack">3.2 months</div></div>
+      </div>
+      <div id="simWarn" style="margin-top:14px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LEDGER ────────────────────────────────── -->
+<section class="view" id="v-ledger" hidden>
+  <div class="vhead">
+    <div><h1>Ledger</h1><p class="sub">Every version of every transaction. Nothing here was ever overwritten or deleted.</p></div>
+    <div class="flexg"><button class="btn sm">Saved views</button><button class="btn sm">Export CSV</button></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px"><div class="card-b flexg">
+    <input class="inp" style="width:200px;text-align:left" placeholder="Search description">
+    <select class="inp" style="width:auto;text-align:left"><option>All accounts</option></select>
+    <select class="inp" style="width:auto;text-align:left"><option>All categories</option></select>
+    <select class="inp" style="width:auto;text-align:left"><option>Exclude transfers</option><option>Include transfers</option></select>
+    <span class="mut" style="font-size:12.5px;margin-left:auto">1,284 rows · 18,120 out · 27,500 in</span>
+  </div></div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th>Account</th><th>Category</th><th class="r">Amount</th><th>Origin</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="num">2026-07-28</td><td class="tname">TALABAT ORDER 771902<div class="tsub">Talabat</div></td><td>Visa</td><td><span class="chip blue">Dining</span></td><td class="r num neg">−340.00</td><td><span class="chip">rule 14</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+        <tr><td class="num">2026-07-24</td><td class="tname">CARREFOUR MALL OF EMIR<div class="tsub">Carrefour · split into 2</div></td><td>Visa</td><td><span class="chip blue">Groceries</span> <span class="chip">Household</span></td><td class="r num neg">−612.30</td><td><span class="chip">split</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+        <tr><td class="num">2026-07-14</td><td class="tname">EK FLIGHT BOOKING<div class="tsub">tag: trip:tbilisi</div></td><td>Visa</td><td><span class="chip blue">Travel</span></td><td class="r num neg">−3,900.00</td><td><span class="chip">manual</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+        <tr style="background:#F7F9FA"><td class="num">2026-07-05</td><td class="tname">TRF TO 0290**** SAVINGS<div class="tsub">linked leg · Bank — Savings</div></td><td>Current</td><td><span class="chip">transfer</span></td><td class="r num mut">−8,000.00</td><td><span class="chip">auto-matched</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+        <tr><td class="num">2026-07-02</td><td class="tname">SALARY TRANSFER REF 88213</td><td>Current</td><td><span class="chip blue">Salary</span></td><td class="r num pos">+27,500.00</td><td><span class="chip">rule 1</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+        <tr class="mut"><td class="num">2026-06-30</td><td class="tname">POS 44190 AL BARSHA <span class="chip">v1 · superseded</span><div class="tsub">recategorised 8 Aug · Misc → Groceries</div></td><td>Visa</td><td><span class="chip">Misc</span></td><td class="r num neg">−96.00</td><td><span class="chip">rule 9</span></td><td class="r"><button class="btn sm ghost">raw</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</div>
+</div>
+
+<div id="tour" hidden role="dialog" aria-label="Guided tour">
+  <div class="t-h"><span class="lbl" id="tStep">Step 1 of 14</span><button class="tclose" id="tX" aria-label="Close tour">&times;</button></div>
+  <div class="t-b"><h3 id="tTitle"></h3><p id="tText"></p></div>
+  <div class="t-f">
+    <div class="dots" id="tDots"></div><span class="sp"></span>
+    <button class="btn sm" id="tPrev">Back</button>
+    <button class="btn sm pri" id="tNext">Next</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var fmt=function(n){return n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});};
+
+/* ── navigation ── */
+var views=['close','import','review','reconcile','assets','reports','goals','ledger'];
+function go(name){
+  if(views.indexOf(name)<0)return;
+  views.forEach(function(v){document.getElementById('v-'+v).hidden=(v!==name);});
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.setAttribute('aria-selected',String(t.dataset.go===name));
+  });
+  window.scrollTo({top:0,behavior:'instant'});
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-go]');
+  if(t){e.preventDefault();go(t.dataset.go);}
+});
+
+/* ── review queue ── */
+var cats=['Groceries','Dining','Transport','Utilities','Household','Health'];
+var queue=[
+  {d:'EK FLIGHT BOOKING',a:-3900,ac:'Visa',dt:'2026-07-14',why:'uncategorised',hint:'large amount — verify',raw:'EK*FLIGHTBOOKING DXB 771A'},
+  {d:'TRF TO 0290**** SAVINGS',a:-8000,ac:'Current',dt:'2026-07-05',why:'probable transfer',hint:'matches +8,000 in Bank — Savings on 5 Jul',raw:'TRF TO 0290XXXX'},
+  {d:'ADCB CARD PAYMENT',a:-6140,ac:'Current',dt:'2026-07-26',why:'probable transfer',hint:'card payment — not spending',raw:'CARD PAYMENT REF 5512'},
+  {d:'CASH WITHDRAWAL ATM 118',a:-2000,ac:'Current',dt:'2026-07-11',why:'probable transfer',hint:'moves to Cash on hand',raw:'ATM WDL 118 AL QUOZ'},
+  {d:'AL ADIL TRADING LLC',a:-760,ac:'Visa',dt:'2026-07-19',why:'uncategorised',hint:'new merchant, never seen before',raw:'AL ADIL TRADING LLC DXB'},
+  {d:'POS 44190 AL BARSHA',a:-96,ac:'Visa',dt:'2026-07-07',why:'uncategorised',hint:'no rule matched',raw:'POS 44190 AL BARSHA'},
+  {d:'NOON.COM ORDER',a:-289,ac:'Visa',dt:'2026-07-21',why:'uncategorised',hint:'could be Household or Electronics',raw:'NOON COM ORDER 9921'},
+  {d:'SALIK RECHARGE',a:-100,ac:'Visa',dt:'2026-07-08',why:'possible duplicate',hint:'identical row on 8 Jul from another file',raw:'SALIK RECHARGE'},
+  {d:'TALABAT ORDER 771902',a:-340,ac:'Visa',dt:'2026-07-28',why:'possible duplicate',hint:'appears in statement but not in ledger',raw:'TALABAT ORDER 771902'},
+  {d:'PHARMACY LIFE DXB',a:-186,ac:'Visa',dt:'2026-07-16',why:'uncategorised',hint:'no rule matched',raw:'PHARMACY LIFE DXB'},
+  {d:'UNKNOWN MERCHANT 8812',a:-455,ac:'Visa',dt:'2026-07-23',why:'uncategorised',hint:'description is unreadable — check the receipt',raw:'8812***'},
+  {d:'DU BILL PAYMENT',a:-310,ac:'Current',dt:'2026-07-09',why:'low-confidence rule',hint:'rule 22 matched at 61% — confirm Utilities',raw:'DU BILL PAYMENT'},
+  {d:'quarantined row',a:-340,ac:'Visa',dt:'—',why:'import error',hint:'date cell is empty — type the date to release it',raw:'(empty date)'},
+  {d:'quarantined row',a:0,ac:'Visa',dt:'—',why:'import error',hint:'amount cell contains text',raw:'"see note"'}
+];
+var qi=0;
+
+function renderFocus(){
+  var t=queue[qi],el=document.getElementById('focusCard');
+  if(!t){el.innerHTML='<div class="card-b" style="text-align:center;padding:60px 20px"><div style="font-size:16px;font-weight:600">Queue is clear.</div><p class="sub" style="margin:6px auto 14px">Nothing is blocking the close. Next step is reconciling accounts.</p><button class="btn pri" data-go="reconcile">Go to reconcile</button></div>';return;}
+  var cls=t.a<0?'neg':'pos';
+  el.innerHTML=
+   '<div class="focus-top">'
+   +'<div class="rowbtwn"><div class="focus-desc">'+t.d+'</div><div class="focus-amt '+cls+'">'+(t.a<0?'−':'+')+fmt(Math.abs(t.a))+'</div></div>'
+   +'<div class="focus-meta"><span class="num">'+t.dt+'</span><span>'+t.ac+'</span>'
+   +'<span class="chip '+(t.why==='uncategorised'?'warn':t.why==='import error'?'bad':'blue')+'">'+t.why+'</span>'
+   +'<span class="mut num" style="font-size:11.5px">'+t.raw+'</span></div>'
+   +'<div class="note info" style="margin-top:11px">'+t.hint+'</div>'
+   +'</div>'
+   +'<div class="opts">'
+   +cats.map(function(c,i){return '<button class="opt" data-cat="'+c+'"><span class="key">'+(i+1)+'</span>'+c+'</button>';}).join('')
+   +'</div>'
+   +'<div class="opts" style="padding-top:0;grid-template-columns:repeat(4,1fr)">'
+   +'<button class="opt" data-act="t"><span class="key">T</span>Link as transfer</button>'
+   +'<button class="opt" data-act="s"><span class="key">S</span>Split</button>'
+   +'<button class="opt" data-act="r"><span class="key">R</span>Make a rule</button>'
+   +'<button class="opt" data-act="u"><span class="key">U</span>Skip</button>'
+   +'</div>';
+}
+function renderList(){
+  var l=document.getElementById('qList');
+  l.innerHTML=queue.map(function(t,i){
+    return '<button class="qitem'+(i===qi?' cur':'')+'" data-i="'+i+'">'
+      +'<div class="qtop"><span class="qdesc">'+t.d+'</span>'
+      +'<span class="num '+(t.a<0?'neg':'mut')+'" style="font-size:12px">'+(t.a?fmt(Math.abs(t.a)):'—')+'</span></div>'
+      +'<div class="tsub">'+t.dt+' · '+t.why+'</div></button>';
+  }).join('');
+  document.getElementById('qCount').textContent=queue.length+' left';
+  document.getElementById('railQueue').textContent=queue.length;
+  var tb=document.getElementById('tabQueue');
+  if(queue.length){tb.textContent=queue.length;tb.hidden=false;}else{tb.hidden=true;}
+  var done=14-queue.length;
+  document.getElementById('qProgress').innerHTML=
+    '<span class="chip '+(queue.length?'warn':'good')+'">'+done+' of 14 resolved</span>'
+    +(queue.length?'<span class="chip bad">blocks the close</span>':'<span class="chip good">close unblocked</span>');
+}
+function resolve(){queue.splice(qi,1);if(qi>=queue.length)qi=Math.max(0,queue.length-1);renderFocus();renderList();}
+
+document.getElementById('qList').addEventListener('click',function(e){
+  var b=e.target.closest('[data-i]');if(!b)return;
+  qi=+b.dataset.i;renderFocus();renderList();
+});
+document.getElementById('focusCard').addEventListener('click',function(e){
+  var b=e.target.closest('[data-cat],[data-act]');if(!b)return;
+  if(b.dataset.act==='u'){qi=(qi+1)%Math.max(1,queue.length);renderFocus();renderList();return;}
+  resolve();
+});
+document.addEventListener('keydown',function(e){
+  if(document.getElementById('v-review').hidden)return;
+  if(/input|select|textarea/i.test(e.target.tagName))return;
+  var k=e.key.toLowerCase();
+  if(k==='j'){qi=Math.min(queue.length-1,qi+1);renderFocus();renderList();}
+  else if(k==='k'){qi=Math.max(0,qi-1);renderFocus();renderList();}
+  else if(k==='u'){qi=queue.length?(qi+1)%queue.length:0;renderFocus();renderList();}
+  else if('123456tsr'.indexOf(k)>=0&&queue.length){resolve();}
+  else return;
+  e.preventDefault();
+});
+
+/* ── report categories ── */
+var catData=[
+  ['Rent',6000,6000,[6,6,6,6,6,6],'33%',0],
+  ['Groceries',2140,1980,[1.8,2.1,1.9,2.0,1.9,2.14],'12%',1],
+  ['Travel',3900,1150,[0,0,1.2,2.3,0,3.9],'22%',1],
+  ['Family support',1500,1500,[1.5,1.5,1.5,1.5,1.5,1.5],'8%',0],
+  ['Dining',1480,1210,[1.1,1.3,1.2,1.0,1.4,1.48],'8%',1],
+  ['Misc',905,640,[.6,.7,.5,.8,.6,.9],'5%',1],
+  ['Transport',890,830,[.8,.9,.8,.85,.8,.89],'5%',0],
+  ['Utilities',620,595,[.6,.58,.6,.61,.57,.62],'3%',0],
+  ['Subscriptions',385,385,[.38,.38,.38,.38,.38,.38],'2%',0],
+  ['Health',300,410,[.4,.5,.3,.45,.4,.3],'2%',0]
+];
+document.getElementById('catRows').innerHTML=catData.map(function(c){
+  var mx=Math.max.apply(null,c[3]);
+  var sp='<div class="spark">'+c[3].map(function(v,i){
+    return '<i style="height:'+Math.max(2,(v/mx)*20)+'px" class="'+(i===5?'hi':'')+'"></i>';
+  }).join('')+'</div>';
+  var d=c[1]-c[2],dl=d>0?'<span class="neg num" style="font-size:11.5px"> +'+fmt(d)+'</span>':'';
+  return '<tr><td class="tname">'+c[0]+(c[5]?'':' <span class="chip">essential</span>')+'</td>'
+    +'<td class="r num">'+fmt(c[1])+'</td><td class="r num mut">'+fmt(c[2])+dl+'</td>'
+    +'<td>'+sp+'</td><td class="r num mut">'+c[4]+'</td></tr>';
+}).join('');
+
+/* ── net worth sparks ── */
+var nw=[142900,146200,149800,152100,158400,163000,168400,172900,178200,183600,187935,197315];
+var mn=Math.min.apply(null,nw),mx=Math.max.apply(null,nw);
+document.getElementById('nwSpark').innerHTML=nw.map(function(v,i){
+  var h=14+((v-mn)/(mx-mn))*74;
+  return '<i style="height:'+h+'px;width:100%;background:'+(i===11?'var(--blue)':'var(--rule)')+'" title="'+fmt(v)+'"></i>';
+}).join('');
+
+/* ── goals ── */
+var surplus=9380,liquid=83400,essential=11240;
+var goals=[
+  {n:'Emergency fund → 6 months',t:67440,f:60000,by:'2026-10',st:'saving',note:'Highest rank on purpose: every goal below is measured against what it does to this.'},
+  {n:'Laptop replacement',t:9500,f:0,by:'2026-10',st:'planned',note:'Current machine is 5 years old.'},
+  {n:'Car upgrade',t:90000,f:12000,by:'2027-03',st:'saving',note:'Assumes 24,000 trade-in.'},
+  {n:'Trip — Japan',t:14000,f:0,by:'',st:'idea',note:'No date yet. Sits below the car deliberately.'}
+];
+document.getElementById('goalList').innerHTML=goals.map(function(g,i){
+  var short=Math.max(0,g.t-g.f);
+  var months=short/surplus;
+  var ready=new Date(2026,7+Math.ceil(months),1);
+  var runwayAfter=(liquid-short)/essential;
+  var pct=Math.min(100,Math.round(g.f/g.t*100));
+  return '<div class="goal">'
+   +'<div class="goal-h"><span class="rank num">'+(i+1)+'</span>'
+   +'<span class="goal-n">'+g.n+'</span>'
+   +'<span class="chip '+(g.st==='saving'?'good':g.st==='planned'?'blue':'')+'">'+g.st+'</span>'
+   +'<span style="flex:1"></span>'
+   +'<span class="num" style="font-weight:500">'+fmt(g.t)+'</span>'
+   +'<button class="btn sm">Edit</button></div>'
+   +'<div class="goal-b">'
+     +'<div class="mini"><span class="lbl">Funded</span><div class="mv">'+fmt(g.f)+' <span class="mut" style="font-size:12px">of '+fmt(g.t)+'</span></div>'
+       +'<div class="bar"><i style="width:'+pct+'%;background:var(--blue)"></i></div></div>'
+     +'<div class="mini"><span class="lbl">Affordable from</span><div class="mv">'
+       +(short===0?'<span class="pos">now</span>':ready.toLocaleString('en-US',{month:'short',year:'numeric'}))
+       +'</div><div class="tsub">'+(short===0?'fully funded':'short '+fmt(short)+' · '+months.toFixed(1)+' months at current surplus')+'</div></div>'
+     +'<div class="mini"><span class="lbl">If bought today</span><div class="mv '+(runwayAfter<6?'neg':'')+'">'+runwayAfter.toFixed(1)+' months runway</div>'
+       +'<div class="tsub">'+(runwayAfter<6?'drops below your 6-month floor':'stays above your floor')+'</div></div>'
+   +'</div>'
+   +'<div class="card-h" style="border-top:1px solid var(--rule2);border-bottom:0"><span class="tsub">'+g.note+'</span>'
+   +'<button class="btn sm ghost">Link a purchase</button></div>'
+   +'</div>';
+}).join('');
+
+/* ── simulator ── */
+var sim=document.getElementById('sim');
+function runSim(){
+  var v=+sim.value,after=liquid-v,run=after/essential,back=Math.max(0,(liquid-after)/surplus);
+  document.getElementById('simAmt').textContent=fmt(v);
+  document.getElementById('simLiq').textContent=fmt(after);
+  document.getElementById('simRun').textContent=run.toFixed(1)+' months';
+  document.getElementById('simRun').className='mv num'+(run<6?' neg':'');
+  document.getElementById('simBack').textContent=back.toFixed(1)+' months';
+  var w=document.getElementById('simWarn');
+  if(run<3)w.innerHTML='<div class="note bad"><b>Runway falls to '+run.toFixed(1)+' months.</b> One lost income month would put you into the card.</div>';
+  else if(run<6)w.innerHTML='<div class="note"><b>Runway falls below your 6-month floor.</b> It takes '+back.toFixed(1)+' months of saving to get back.</div>';
+  else w.innerHTML='<div class="note info">Runway stays above your 6-month floor.</div>';
+}
+sim.addEventListener('input',runSim);
+
+renderFocus();renderList();runSim();
+
+/* ── guided tour ── */
+var tour=[
+ {v:'close',el:'#railEl',t:'One session a month',x:'Everything happens down this list, top to bottom. The gold dot is where you are, and the red numbers are what still needs you.'},
+ {v:'close',el:'#nwCard',t:'What you own, in one number',x:'Everything added up — bank, cash, gold, investments — minus what you owe. The bar underneath shows what it is made of.'},
+ {v:'close',el:'#runwayCard',t:'How long you could last',x:'If income stopped today, this is how many months the money on hand would cover the essentials.'},
+ {v:'close',el:'#alerts',t:'What needs a look',x:'The app tells you what is off before you go hunting for it. Each one links to the screen that fixes it.'},
+ {v:'import',el:'#importSummary',t:'Drop in the bank file',x:'Download the statement, drop it here. It reads the rows and tells you what is new and what it already has.'},
+ {v:'import',el:'#commitBar',t:'Nothing saves until you say so',x:'You see the rows first. If something looks wrong, throw it away and nothing changed.'},
+ {v:'review',el:'#focusCard',t:'Anything unclear waits here',x:'One purchase at a time, biggest first. It shows what it is and why it stopped to ask.'},
+ {v:'review',el:'#keybar',t:'One key answers it',x:'Press a number to say what it was. Press T when money just moved between your own accounts, so it is not counted as spending.'},
+ {v:'reconcile',el:'#reconCard',t:'Does it match the bank?',x:'Type the balance printed on the statement. Green means the app agrees with the bank. Red means something is missing.'},
+ {v:'reconcile',el:'#resolveCard',t:'Find the missing piece',x:'It suggests what the gap probably is. You pick, and the numbers line up again.'},
+ {v:'assets',el:'#holdingsCard',t:'Gold and investments',x:'It stores the grams, not the price. Update today\u2019s gold price and everything recalculates.'},
+ {v:'reports',el:'#catCard',t:'Where the money went',x:'Every category with this month next to the usual, so anything unusual stands out.'},
+ {v:'goals',el:'#goalList',t:'Things we want to buy',x:'In order of what matters most. Each one shows when we can afford it, and what buying it does to the safety cushion.'},
+ {v:'goals',el:'#simCard',t:'What if we spent it now?',x:'Drag the slider. It shows what the cushion drops to, and how long it takes to build back.'}
+];
+var ti=0,tEl=null;
+var tourBox=document.getElementById('tour');
+function clearSpot(){if(tEl){tEl.classList.remove('spot');tEl=null;}}
+function showTour(i){
+  ti=Math.max(0,Math.min(tour.length-1,i));
+  var s=tour[ti];
+  go(s.v);
+  clearSpot();
+  var el=document.querySelector(s.el);
+  if(el){tEl=el;el.classList.add('spot');
+    if(el.id!=='railEl')el.scrollIntoView({block:'center',behavior:'smooth'});}
+  document.getElementById('tTitle').textContent=s.t;
+  document.getElementById('tText').textContent=s.x;
+  document.getElementById('tStep').textContent='Step '+(ti+1)+' of '+tour.length;
+  document.getElementById('tDots').innerHTML=tour.map(function(_,k){return '<i class="'+(k===ti?'on':'')+'"></i>';}).join('');
+  document.getElementById('tPrev').disabled=(ti===0);
+  document.getElementById('tNext').textContent=(ti===tour.length-1)?'Done':'Next';
+  tourBox.hidden=false;
+}
+function endTour(){clearSpot();tourBox.hidden=true;}
+document.getElementById('tNext').addEventListener('click',function(){
+  if(ti===tour.length-1)endTour();else showTour(ti+1);
+});
+document.getElementById('tPrev').addEventListener('click',function(){showTour(ti-1);});
+document.getElementById('tX').addEventListener('click',endTour);
+document.getElementById('tourBtn').addEventListener('click',function(){showTour(0);});
+document.addEventListener('keydown',function(e){
+  if(tourBox.hidden)return;
+  if(e.key==='Escape')endTour();
+  else if(e.key==='ArrowRight'){if(ti<tour.length-1)showTour(ti+1);else endTour();}
+  else if(e.key==='ArrowLeft')showTour(ti-1);
+  else return;
+  e.preventDefault();
+});
+setTimeout(function(){showTour(0);},450);
+})();
+</script>
+</body>
+</html>
