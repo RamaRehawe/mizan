@@ -1,6 +1,6 @@
 namespace Mizan.Models;
 
-public class Category
+public class Category : ITimestamped
 {
     public int Id { get; set; }
     public int? ParentId { get; set; }
@@ -10,4 +10,5 @@ public class Category
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

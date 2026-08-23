@@ -1,6 +1,9 @@
 namespace Mizan.Models;
 
-public class Txn
+/// <summary>The economic fact only — void, correction, and split are operations recorded
+/// against a txn in <see cref="TxnVoid"/>, <see cref="TxnSupersession"/>, and
+/// <see cref="TxnSplit"/>, never columns here.</summary>
+public class Txn : ITimestamped
 {
     public int Id { get; set; }
     public int AccountId { get; set; }
@@ -13,18 +16,16 @@ public class Txn
     public string? DescriptionNorm { get; set; }
     public int? CategoryId { get; set; }
     public Category? Category { get; set; }
+
     public TxnOrigin Origin { get; set; }
-    public bool IsVoid { get; set; }
-    public string? VoidReason { get; set; }
 
-    // Split parent — unused until Phase 1 of the full requirements doc (post-v0.1).
-    public int? ParentTxnId { get; set; }
-
-    // Versioning — corrections insert a new row and set SupersededById on the old one. Never UPDATE amount/date/account.
-    public int Version { get; set; } = 1;
-    public int? SupersedesId { get; set; }
-    public int? SupersededById { get; set; }
+    /// <summary>Free-form provenance set once at creation, never edited — a filename for an
+    /// import, a seed run identifier, or null for a plain manual entry. A placeholder ahead of
+    /// the real raw_row_id/import_batch audit trail the Import phase will add.</summary>
+    public string? SourceDetail { get; set; }
 
     public required string DedupeKey { get; set; }
+
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

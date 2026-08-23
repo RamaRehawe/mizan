@@ -11,7 +11,7 @@ using Mizan.Models;
 namespace Mizan.Migrations
 {
     [DbContext(typeof(MizanDbContext))]
-    [Migration("20260823150258_InitialSchema")]
+    [Migration("20260823160705_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -28,8 +28,10 @@ namespace Mizan.Migrations
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
@@ -52,7 +54,8 @@ namespace Mizan.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .UseCollation("NOCASE");
 
                     b.Property<long>("OpeningBalanceMinor")
                         .HasColumnType("INTEGER")
@@ -71,8 +74,18 @@ namespace Mizan.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("type");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
                     b.HasKey("Id")
                         .HasName("pk_account");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_account_name");
 
                     b.ToTable("account", null, t =>
                         {
@@ -90,8 +103,10 @@ namespace Mizan.Migrations
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER")
@@ -114,6 +129,12 @@ namespace Mizan.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("INTEGER")
                         .HasColumnName("sort_order");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
 
                     b.HasKey("Id")
                         .HasName("pk_category");
@@ -151,8 +172,10 @@ namespace Mizan.Migrations
                         .HasColumnName("category_id");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
@@ -173,10 +196,6 @@ namespace Mizan.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("description_raw");
 
-                    b.Property<bool>("IsVoid")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("is_void");
-
                     b.Property<DateOnly>("OccurredOn")
                         .HasColumnType("TEXT")
                         .HasColumnName("occurred_on");
@@ -186,25 +205,15 @@ namespace Mizan.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("origin");
 
-                    b.Property<int?>("ParentTxnId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("parent_txn_id");
-
-                    b.Property<int?>("SupersededById")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("superseded_by_id");
-
-                    b.Property<int?>("SupersedesId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("supersedes_id");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("version");
-
-                    b.Property<string>("VoidReason")
+                    b.Property<string>("SourceDetail")
                         .HasColumnType("TEXT")
-                        .HasColumnName("void_reason");
+                        .HasColumnName("source_detail");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
 
                     b.HasKey("Id")
                         .HasName("pk_txn");
@@ -216,23 +225,127 @@ namespace Mizan.Migrations
                         .HasDatabaseName("ix_txn_category_id");
 
                     b.HasIndex("DedupeKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_txn_dedupe_key")
-                        .HasFilter("superseded_by_id IS NULL AND is_void = 0");
-
-                    b.HasIndex("ParentTxnId")
-                        .HasDatabaseName("ix_txn_parent_txn_id");
-
-                    b.HasIndex("SupersededById")
-                        .HasDatabaseName("ix_txn_superseded_by_id");
-
-                    b.HasIndex("SupersedesId")
-                        .HasDatabaseName("ix_txn_supersedes_id");
+                        .HasDatabaseName("ix_txn_dedupe_key");
 
                     b.ToTable("txn", null, t =>
                         {
                             t.HasCheckConstraint("CK_txn_origin", "origin IN ('import','manual','split','adjustment','seed')");
                         });
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnSplit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ChildTxnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("child_txn_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.Property<int>("ParentTxnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("parent_txn_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.HasKey("Id")
+                        .HasName("pk_txn_split");
+
+                    b.HasIndex("ChildTxnId")
+                        .HasDatabaseName("ix_txn_split_child_txn_id");
+
+                    b.HasIndex("ParentTxnId")
+                        .HasDatabaseName("ix_txn_split_parent_txn_id");
+
+                    b.ToTable("txn_split", (string)null);
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnSupersession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.Property<int>("NewTxnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("new_txn_id");
+
+                    b.Property<int>("OldTxnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("old_txn_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.HasKey("Id")
+                        .HasName("pk_txn_supersession");
+
+                    b.HasIndex("NewTxnId")
+                        .HasDatabaseName("ix_txn_supersession_new_txn_id");
+
+                    b.HasIndex("OldTxnId")
+                        .HasDatabaseName("ix_txn_supersession_old_txn_id");
+
+                    b.ToTable("txn_supersession", (string)null);
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnVoid", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reason");
+
+                    b.Property<int>("TxnId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("txn_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("strftime('%Y-%m-%dT%H:%M:%fZ','now')");
+
+                    b.HasKey("Id")
+                        .HasName("pk_txn_void");
+
+                    b.HasIndex("TxnId")
+                        .HasDatabaseName("ix_txn_void_txn_id");
+
+                    b.ToTable("txn_void", (string)null);
                 });
 
             modelBuilder.Entity("Mizan.Models.Category", b =>
@@ -261,27 +374,63 @@ namespace Mizan.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_txn_category_category_id");
 
-                    b.HasOne("Mizan.Models.Txn", null)
-                        .WithMany()
-                        .HasForeignKey("ParentTxnId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_txn_txn_parent_txn_id");
-
-                    b.HasOne("Mizan.Models.Txn", null)
-                        .WithMany()
-                        .HasForeignKey("SupersededById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_txn_txn_superseded_by_id");
-
-                    b.HasOne("Mizan.Models.Txn", null)
-                        .WithMany()
-                        .HasForeignKey("SupersedesId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_txn_txn_supersedes_id");
-
                     b.Navigation("Account");
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnSplit", b =>
+                {
+                    b.HasOne("Mizan.Models.Txn", "ChildTxn")
+                        .WithMany()
+                        .HasForeignKey("ChildTxnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_txn_split_txn_child_txn_id");
+
+                    b.HasOne("Mizan.Models.Txn", "ParentTxn")
+                        .WithMany()
+                        .HasForeignKey("ParentTxnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_txn_split_txn_parent_txn_id");
+
+                    b.Navigation("ChildTxn");
+
+                    b.Navigation("ParentTxn");
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnSupersession", b =>
+                {
+                    b.HasOne("Mizan.Models.Txn", "NewTxn")
+                        .WithMany()
+                        .HasForeignKey("NewTxnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_txn_supersession_txn_new_txn_id");
+
+                    b.HasOne("Mizan.Models.Txn", "OldTxn")
+                        .WithMany()
+                        .HasForeignKey("OldTxnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_txn_supersession_txn_old_txn_id");
+
+                    b.Navigation("NewTxn");
+
+                    b.Navigation("OldTxn");
+                });
+
+            modelBuilder.Entity("Mizan.Models.TxnVoid", b =>
+                {
+                    b.HasOne("Mizan.Models.Txn", "Txn")
+                        .WithMany()
+                        .HasForeignKey("TxnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_txn_void_txn_txn_id");
+
+                    b.Navigation("Txn");
                 });
 
             modelBuilder.Entity("Mizan.Models.Account", b =>

@@ -1,6 +1,6 @@
 namespace Mizan.Models;
 
-public class Account
+public class Account : ITimestamped
 {
     public int Id { get; set; }
     public required string Name { get; set; }
@@ -13,6 +13,7 @@ public class Account
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
     public List<Txn> Txns { get; set; } = [];
 }
