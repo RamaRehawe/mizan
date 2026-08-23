@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Mizan</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="topbar">
+            <a class="brand" asp-area="" asp-controller="Home" asp-action="Index">Mizan</a>
+        </nav>
+    </header>
+    <main>
+        @RenderBody()
+    </main>
+
+    <script src="~/vendor/htmx.min.js"></script>
+    <script src="~/vendor/alpine.min.js" defer></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

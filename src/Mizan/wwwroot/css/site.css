@@ -1,0 +1,47 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1b2430;
+  background: #f5f6f4;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #d7dbd6;
+  background: #fff;
+}
+
+.topbar .brand {
+  font-weight: 700;
+  color: #1b2430;
+  text-decoration: none;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.placeholder {
+  padding: 40px 0;
+  color: #4b5a5a;
+}
+
+.placeholder h1 {
+  margin: 0 0 8px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td.num, th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
