@@ -1,7 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+using Mizan.Models;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// data/ lives at the repo root (mizan/data/), one level above src/Mizan — resolved from
+// ContentRootPath rather than a relative connection string, since a relative path in the
+// connection string would resolve against the process's working directory instead, which
+// differs between `dotnet run`, Visual Studio, and `dotnet ef`.
+var dbPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "mizan.db"));
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
+builder.Services.AddDbContext<MizanDbContext>(options =>
+    options.UseSqlite($"Data Source={dbPath}").UseSnakeCaseNamingConvention());
 
 var app = builder.Build();
 
