@@ -33,12 +33,19 @@ public static class SeedGenerator
         var tracker = new OccurrenceTracker();
         var txns = new List<Txn>();
         var julyTotals = new MonthTotals();
+        // Running tally, not a query — by construction it equals opening balance plus every
+        // txn through AsOf, independent of whatever AccountBalanceService's own query does.
+        var balancesAsOfMinor = accounts.Values.ToDictionary(a => a.Name, a => a.OpeningBalanceMinor);
 
         for (var month = new DateOnly(HistoryStart.Year, HistoryStart.Month, 1); month <= AsOf; month = month.AddMonths(1))
         {
             var isJuly = month.Year == AsOf.Year && month.Month == AsOf.Month;
             var monthTxns = GenerateMonth(month, accounts, categories, rng, tracker);
             txns.AddRange(monthTxns);
+            foreach (var t in monthTxns)
+            {
+                balancesAsOfMinor[t.Account!.Name] += t.AmountMinor;
+            }
             if (isJuly)
             {
                 julyTotals = Tally(monthTxns);
@@ -51,7 +58,7 @@ public static class SeedGenerator
         Console.WriteLine($"Seeded {accounts.Count} accounts, {categories.Count} categories, {txns.Count} transactions " +
             $"({HistoryStart:yyyy-MM} through {AsOf:yyyy-MM}).");
 
-        WriteSeedCheck(docsPath, accounts, julyTotals);
+        WriteSeedCheck(docsPath, accounts, julyTotals, balancesAsOfMinor);
     }
 
     private static Dictionary<string, Account> CreateAccounts(MizanDbContext db)
@@ -99,6 +106,7 @@ public static class SeedGenerator
             new() { Name = "Dining", Kind = CategoryKind.Expense, Parent = living },
             new() { Name = "Savings Transfer", Kind = CategoryKind.Transfer, Parent = transfers },
             new() { Name = "Card Payment", Kind = CategoryKind.Transfer, Parent = transfers },
+            new() { Name = "Cash Withdrawal", Kind = CategoryKind.Transfer, Parent = transfers },
         ];
         db.Categories.AddRange(leaves);
 
@@ -166,6 +174,13 @@ public static class SeedGenerator
         txns.Add(MakeTxn(tracker, current, paymentDay, -cardPurchaseTotal, "Card payment", categories["Card Payment"]));
         txns.Add(MakeTxn(tracker, card, paymentDay, cardPurchaseTotal, "Card payment received", categories["Card Payment"]));
 
+        // Without this, cash on hand only ever gets spent from (dining) and never topped up —
+        // it drains to a nonsensical negative balance over 24 months. A monthly ATM withdrawal
+        // keeps it funded, the same way a real cash account works.
+        var atmDay = new DateOnly(month.Year, month.Month, 10);
+        txns.Add(MakeTxn(tracker, current, atmDay, -500.00m, "ATM withdrawal", categories["Cash Withdrawal"]));
+        txns.Add(MakeTxn(tracker, cash, atmDay, 500.00m, "ATM withdrawal", categories["Cash Withdrawal"]));
+
         return txns;
     }
 
@@ -207,16 +222,12 @@ public static class SeedGenerator
         return totals;
     }
 
-    private static void WriteSeedCheck(string docsPath, Dictionary<string, Account> accounts, MonthTotals july)
+    private static void WriteSeedCheck(string docsPath, Dictionary<string, Account> accounts, MonthTotals july, Dictionary<string, long> balancesAsOfMinor)
     {
         var balances = accounts.Values
             .OrderBy(a => a.Name)
-            .Select(a => (a.Name, BalanceMinor: a.OpeningBalanceMinor))
+            .Select(a => (a.Name, OpeningMinor: a.OpeningBalanceMinor, AsOfMinor: balancesAsOfMinor[a.Name]))
             .ToList();
-        // Balances here are opening-only placeholders; the real per-account balance as of AsOf
-        // is computed by AccountBalanceService in Phase 4 and belongs in this file once that
-        // exists. This placeholder keeps the seed generator from depending on a service that
-        // doesn't exist yet.
 
         var netIncomeMinor = july.IncomeMinor + july.ExpenseMinor;
         var savingsRate = july.IncomeMinor == 0 ? 0m : (decimal)netIncomeMinor / july.IncomeMinor;
@@ -242,18 +253,16 @@ public static class SeedGenerator
             income and expense above, by construction — they're never summed into `julyTotals`
             because their category kind is `transfer`, not `income`/`expense`.
 
-            ## Account opening balances (not the {AsOf:yyyy-MM} balance — see note)
+            ## Account balances as of {AsOf:yyyy-MM-dd} (AccountBalanceService must match exactly)
 
-            | Account | Opening balance (AED) |
-            |---|---:|
-            {string.Join("\n", balances.Select(b => $"| {b.Name} | {b.BalanceMinor / 100m:N2} |"))}
+            | Account | Opening (AED) | As of {AsOf:yyyy-MM-dd} (AED) |
+            |---|---:|---:|
+            {string.Join("\n", balances.Select(b => $"| {b.Name} | {b.OpeningMinor / 100m:N2} | {b.AsOfMinor / 100m:N2} |"))}
 
-            **Note:** the actual {AsOf:yyyy-MM} balance per account (opening balance plus every
-            transaction through {AsOf:yyyy-MM-dd}) isn't listed here yet — computing it
-            independently of `AccountBalanceService` means re-deriving the same SQL that
-            service will contain, which defeats the point of an independent check. Once Phase 4
-            lands, extend this section with the exact number `AccountBalanceService` should
-            produce, computed by the seed generator's own running tally rather than a query.
+            The "as of" column is the seed generator's own running tally — opening balance plus
+            every transaction added as it was generated, month by month — not a query against
+            what got inserted. That's deliberate: if `AccountBalanceService`'s query has a bug,
+            it can't also be baked into the number it's being checked against.
             """;
 
         Directory.CreateDirectory(docsPath);

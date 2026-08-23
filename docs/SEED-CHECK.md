@@ -18,18 +18,16 @@ Transfers (the monthly savings transfer and card payment) are excluded from both
 income and expense above, by construction — they're never summed into `julyTotals`
 because their category kind is `transfer`, not `income`/`expense`.
 
-## Account opening balances (not the 2026-07 balance — see note)
+## Account balances as of 2026-07-31 (AccountBalanceService must match exactly)
 
-| Account | Opening balance (AED) |
-|---|---:|
-| Bank - Current | 5,000.00 |
-| Bank - Savings | 20,000.00 |
-| Card - Visa | 0.00 |
-| Cash on hand | 500.00 |
+| Account | Opening (AED) | As of 2026-07-31 (AED) |
+|---|---:|---:|
+| Bank - Current | 5,000.00 | 260,969.65 |
+| Bank - Savings | 20,000.00 | 212,000.00 |
+| Card - Visa | 0.00 | 0.00 |
+| Cash on hand | 500.00 | 1,720.46 |
 
-**Note:** the actual 2026-07 balance per account (opening balance plus every
-transaction through 2026-07-31) isn't listed here yet — computing it
-independently of `AccountBalanceService` means re-deriving the same SQL that
-service will contain, which defeats the point of an independent check. Once Phase 4
-lands, extend this section with the exact number `AccountBalanceService` should
-produce, computed by the seed generator's own running tally rather than a query.
+The "as of" column is the seed generator's own running tally — opening balance plus
+every transaction added as it was generated, month by month — not a query against
+what got inserted. That's deliberate: if `AccountBalanceService`'s query has a bug,
+it can't also be baked into the number it's being checked against.
