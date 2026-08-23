@@ -13,7 +13,7 @@ namespace Mizan.Migrations
         {
             // EF Core's SQLite CreateTable() builder has no way to emit STRICT, so all six
             // tables are raw SQL. Everything below the tables (indexes, including the account
-            // name uniqueness) is what EF generated unmodified.
+            // name and dedupe_key uniqueness) is what EF generated unmodified.
             migrationBuilder.Sql(
                 """
                 CREATE TABLE "account" (
@@ -135,7 +135,8 @@ namespace Mizan.Migrations
             migrationBuilder.CreateIndex(
                 name: "ix_txn_dedupe_key",
                 table: "txn",
-                column: "dedupe_key");
+                column: "dedupe_key",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_txn_split_child_txn_id",
@@ -178,24 +179,6 @@ namespace Mizan.Migrations
                     END
                     """);
             }
-
-            // Replaces the partial unique index the original single-table design used: "at most
-            // one live txn per dedupe_key" now depends on txn_void and txn_supersession too,
-            // which SQLite can't express as a same-table index WHERE clause. A live txn is one
-            // that isn't voided and hasn't been superseded by a later correction.
-            migrationBuilder.Sql(
-                """
-                CREATE TRIGGER trg_txn_dedupe_unique BEFORE INSERT ON "txn"
-                WHEN EXISTS (
-                    SELECT 1 FROM "txn" t
-                    WHERE t.dedupe_key = NEW.dedupe_key
-                      AND NOT EXISTS (SELECT 1 FROM "txn_void" v WHERE v.txn_id = t.id)
-                      AND NOT EXISTS (SELECT 1 FROM "txn_supersession" s WHERE s.old_txn_id = t.id)
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, 'duplicate dedupe_key: a live txn already exists for this key');
-                END
-                """);
         }
 
         /// <inheritdoc />

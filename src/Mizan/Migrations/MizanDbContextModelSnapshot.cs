@@ -222,6 +222,7 @@ namespace Mizan.Migrations
                         .HasDatabaseName("ix_txn_category_id");
 
                     b.HasIndex("DedupeKey")
+                        .IsUnique()
                         .HasDatabaseName("ix_txn_dedupe_key");
 
                     b.ToTable("txn", null, t =>

@@ -65,10 +65,10 @@ public class MizanDbContext(DbContextOptions<MizanDbContext> options) : DbContex
 
             e.Property(x => x.Origin).HasConversion(SnakeCaseEnumConverter.For<TxnOrigin>());
 
-            // Not unique here — "at most one live txn per dedupe_key" now depends on TxnVoid and
-            // TxnSupersession too, which SQLite can't express in a single-table partial index.
-            // Enforced instead by a trigger in the InitialSchema migration.
-            e.HasIndex(x => x.DedupeKey);
+            // Unique across every txn ever, void or superseded included — not just "live" rows.
+            // occurrence_index already exists to distinguish genuinely-repeated real
+            // transactions, so no live row should ever need to reuse a dead row's exact key.
+            e.HasIndex(x => x.DedupeKey).IsUnique();
 
             e.HasOne(x => x.Account)
                 .WithMany(a => a.Txns)
