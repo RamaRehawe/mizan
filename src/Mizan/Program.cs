@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Mizan.Models;
+using Mizan.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,15 @@ builder.Services.AddDbContext<MizanDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}").UseSnakeCaseNamingConvention());
 
 var app = builder.Build();
+
+if (args.Contains("seed"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<MizanDbContext>();
+    var docsPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "docs"));
+    SeedGenerator.Run(db, docsPath);
+    return;
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
