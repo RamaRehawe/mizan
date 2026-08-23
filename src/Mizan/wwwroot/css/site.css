@@ -1,47 +1,86 @@
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #1b2430;
-  background: #f5f6f4;
+/* Palette and component classes ported from docs/prototype.html — same variable names, same
+   card/table/figure system. Deliberately not ported: the ritual rail, the multi-tab topbar, and
+   every component belonging to a screen v0.1 doesn't build (Import, Review, Reconcile, Assets,
+   Goals) — porting their markup now would fake navigation to pages that don't exist.
+   Font stacks use system fonts instead of the prototype's Google Fonts link, so the app keeps
+   working with the network off (the same principle CLAUDE.md states for htmx/Alpine). */
+:root {
+  --ground: #E7EAEE;
+  --paper: #FFFFFF;
+  --ink: #13171C;
+  --ink2: #4A525C;
+  --ink3: #828C97;
+  --rule: #D5DAE0;
+  --rule2: #EBEEF1;
+  --blue: #1C4E80;
+  --blue-wash: #E8EFF6;
+  --out: #9E3527;
+  --in: #20624A;
+  --r: 3px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.neg { color: var(--out); }
+.pos { color: var(--in); }
+.mut { color: var(--ink3); }
+.lbl {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink3);
+}
+a { color: var(--blue); }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .topbar {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid #d7dbd6;
-  background: #fff;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+  padding: 0 26px; display: flex; align-items: center; height: 52px;
 }
+.topbar .brand { font-weight: 600; color: var(--ink); text-decoration: none; font-size: 14.5px; }
 
-.topbar .brand {
-  font-weight: 700;
-  color: #1b2430;
-  text-decoration: none;
+.view { padding: 24px 26px 60px; max-width: 1180px; margin: 0 auto; }
+.vhead { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; gap: 20px; }
+h1 { font-size: 21px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 3px; }
+.sub { color: var(--ink2); font-size: 13px; margin: 0; max-width: 62ch; }
+
+.card { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r); }
+.card-h {
+  padding: 11px 14px; border-bottom: 1px solid var(--rule2);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
+.card-b { padding: 14px; }
+.grid { display: grid; gap: 14px; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.card-solo { max-width: 320px; }
 
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 20px;
+.fig .v { font-family: var(--mono); font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.15; }
+.fig .v small { font-size: 13px; color: var(--ink3); font-weight: 400; margin-left: 3px; }
+.fig .d { font-family: var(--mono); font-size: 11.5px; margin-top: 5px; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 500; text-align: left; padding: 8px 12px;
+  border-bottom: 1px solid var(--rule); white-space: nowrap;
 }
+td { padding: 8px 12px; border-bottom: 1px solid var(--rule2); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+.r { text-align: right; }
+tbody tr:hover { background: #F7F9FA; }
+.tname { font-weight: 500; }
+.tsub { font-size: 11.5px; color: var(--ink3); }
 
-.placeholder {
-  padding: 40px 0;
-  color: #4b5a5a;
-}
-
-.placeholder h1 {
-  margin: 0 0 8px;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-td.num, th.num {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+@media (max-width: 1000px) {
+  .g3 { grid-template-columns: 1fr; }
 }

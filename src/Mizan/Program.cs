@@ -31,7 +31,7 @@ if (args.Contains("seed"))
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/Error");
 }
 app.UseRouting();
 
@@ -41,8 +41,12 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+    pattern: "{controller=Close}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 
 app.Run();
+
+// Top-level statements make Program internal by default — WebApplicationFactory<Program> in
+// the test project needs it visible.
+public partial class Program;
