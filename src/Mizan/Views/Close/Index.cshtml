@@ -1,0 +1,40 @@
+@model CloseViewModel
+@{
+    ViewData["Title"] = "Close";
+    var monthLabel = new DateOnly(Model.Year, Model.Month, 1).ToString("MMMM yyyy");
+}
+
+<div class="view">
+    <div class="vhead">
+        <div>
+            <h1>@monthLabel</h1>
+            <p class="sub">v0.1 — figures below are computed from the database, not a mockup. Net worth, reconciliation, and the review queue aren't built yet.</p>
+        </div>
+    </div>
+
+    <div class="card fig card-solo">
+        <div class="card-b">
+            <span class="lbl">Savings rate</span>
+            <div class="v num">@DisplayFormat.Percent1(Model.Flows.SavingsRate)<small>%</small></div>
+            <div class="d mut">@DisplayFormat.Aed(Model.Flows.NetMinor) kept of @DisplayFormat.Aed(Model.Flows.IncomeMinor) earned</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+        <div class="card-h"><span class="lbl">Accounts</span></div>
+        <table>
+            <tbody>
+                @foreach (var account in Model.Balances)
+                {
+                    <tr>
+                        <td class="tname">
+                            @account.Name
+                            <div class="tsub">@DisplayFormat.EnumLabel(account.LiquidityClass)</div>
+                        </td>
+                        <td class="r num @(account.BalanceMinor < 0 ? "neg" : "")">@DisplayFormat.Aed(account.BalanceMinor)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
