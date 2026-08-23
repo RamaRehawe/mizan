@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Mizan/Mizan.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mizan.Tests/Mizan.Tests.csproj" />
+  </Folder>
 </Solution>
