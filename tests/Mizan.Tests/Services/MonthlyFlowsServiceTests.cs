@@ -4,16 +4,18 @@ namespace Mizan.Tests.Services;
 
 public class MonthlyFlowsServiceTests(DatabaseFixture fixture) : DatabaseTestBase(fixture)
 {
-    // From docs/SEED-CHECK.md.
+    // From docs/SEED-CHECK.md. This also pins investment purchases (gold, fund — kind=investment,
+    // D5) out of the expense total, same as it pins transfers out — if either leaked in, this
+    // exact number would be wrong.
     [Fact]
     public void GetFlows_matches_seed_check_exactly_for_july()
     {
         var flows = MonthlyFlowsService.GetFlows(Db, 2026, 7);
 
         Assert.Equal(2_750_000, flows.IncomeMinor);
-        Assert.Equal(-942_531, flows.ExpenseMinor);
-        Assert.Equal(1_807_469, flows.NetMinor);
-        Assert.Equal(0.657m, Math.Round(flows.SavingsRate, 3));
+        Assert.Equal(-853_775, flows.ExpenseMinor);
+        Assert.Equal(1_896_225, flows.NetMinor);
+        Assert.Equal(0.690m, Math.Round(flows.SavingsRate, 3));
     }
 
     [Fact]
