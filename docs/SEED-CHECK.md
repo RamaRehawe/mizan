@@ -5,29 +5,53 @@ seed generator changes, regenerate this file (`dotnet run -- seed`) rather than
 editing the numbers here; that's the whole point of it being a ground truth
 independent of whatever the service layer computes.
 
-## Monthly flows, 2026-07 (Phase 4's MonthlyFlowsService must match exactly)
+## Monthly flows, 2026-07 (MonthlyFlowsService must match exactly)
 
 | | AED |
 |---|---:|
 | Income | 27,500.00 |
-| Expense | 9,425.31 |
-| Net | 18,074.69 |
-| Savings rate | 65.7% |
+| Expense | 8,537.75 |
+| Net | 18,962.25 |
+| Savings rate | 69.0% |
 
-Transfers (the monthly savings transfer and card payment) are excluded from both
-income and expense above, by construction — they're never summed into `julyTotals`
-because their category kind is `transfer`, not `income`/`expense`.
+Transfers (the monthly savings transfer and card payment) and investment purchases
+(gold, fund) are excluded from both income and expense above, by construction —
+neither `transfer` nor `investment` kind categories are ever summed into
+`julyTotals`.
 
 ## Account balances as of 2026-07-31 (AccountBalanceService must match exactly)
 
 | Account | Opening (AED) | As of 2026-07-31 (AED) |
 |---|---:|---:|
-| Bank - Current | 5,000.00 | 260,969.65 |
+| Bank - Current | 5,000.00 | 242,164.91 |
 | Bank - Savings | 20,000.00 | 212,000.00 |
+| Broker | 0.00 | 0.00 |
 | Card - Visa | 0.00 | 0.00 |
-| Cash on hand | 500.00 | 1,720.46 |
+| Cash on hand | 500.00 | 3,087.95 |
+| Locker | 0.00 | 0.00 |
 
 The "as of" column is the seed generator's own running tally — opening balance plus
 every transaction added as it was generated, month by month — not a query against
-what got inserted. That's deliberate: if `AccountBalanceService`'s query has a bug,
-it can't also be baked into the number it's being checked against.
+what got inserted. Locker and Broker sit at zero here on purpose: their value is
+entirely in the holdings below, not in a cash balance.
+
+## Holdings as of 2026-07-31 (HoldingValuationService must match exactly)
+
+| Asset | Quantity | Price used | Value (AED) |
+|---|---:|---:|---:|
+| Gold 22k | 13.94 | 317.17 | 4,421.35 |
+| Global Equity Fund | 114 | 125.66 | 14,325.24 |
+
+Quantity is the generator's own running sum of every purchase it made, month by
+month — never a stored total (INV-6). Price is that asset's price as of
+2026-07-31, from the `price` table's `seed` rows.
+
+## Net worth as of 2026-07-31 (NetWorthService must match exactly)
+
+**475,999.45 AED**
+
+Every account balance above, plus every holding value above, added together —
+computed the same running-tally way, never a query. This is also exactly what got
+frozen into July's `snapshot` row when the generator closed that period; reading it
+back after the fact (even after later months' prices moved) must still give this
+number.

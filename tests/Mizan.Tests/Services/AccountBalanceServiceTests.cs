@@ -13,14 +13,16 @@ public class AccountBalanceServiceTests(DatabaseFixture fixture) : DatabaseTestB
     {
         var balances = AccountBalanceService.GetBalances(Db, AsOf);
 
-        Assert.Equal(4, balances.Count);
+        Assert.Equal(6, balances.Count);
     }
 
     [Theory]
-    [InlineData("Bank - Current", 26_096_965)]
+    [InlineData("Bank - Current", 24_216_491)]
     [InlineData("Bank - Savings", 21_200_000)]
+    [InlineData("Broker", 0)]
     [InlineData("Card - Visa", 0)]
-    [InlineData("Cash on hand", 172_046)]
+    [InlineData("Cash on hand", 308_795)]
+    [InlineData("Locker", 0)]
     public void GetBalances_matches_seed_check_exactly(string accountName, long expectedBalanceMinor)
     {
         var balances = AccountBalanceService.GetBalances(Db, AsOf);
