@@ -53,7 +53,7 @@ public static class NetWorthService
         var byHolding = lines
             .Where(l => l.AssetId != null)
             .Select(l => new HoldingValuation(
-                l.Asset!.Id, l.Asset.Code, l.Asset.Name, l.Account!.Id, l.Account.Name,
+                l.Asset!.Id, l.Asset.Code, l.Asset.Name, l.Asset.Unit, l.Account!.Id, l.Account.Name,
                 l.Quantity!.Value, l.PriceMinor!.Value, l.PriceAsOf!.Value, l.BalanceMinor, "AED"))
             .ToList();
 

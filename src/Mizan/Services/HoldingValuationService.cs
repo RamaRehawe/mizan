@@ -51,7 +51,7 @@ public static class HoldingValuationService
             var valueMinor = (long)Math.Round(quantity * price.PriceMinor);
 
             result.Add(new HoldingValuation(
-                asset.Id, asset.Code, asset.Name, account.Id, account.Name,
+                asset.Id, asset.Code, asset.Name, asset.Unit, account.Id, account.Name,
                 quantity, price.PriceMinor, price.AsOfDate, valueMinor, price.CurrencyCode));
         }
 

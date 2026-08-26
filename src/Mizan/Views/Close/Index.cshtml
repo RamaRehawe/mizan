@@ -1,22 +1,58 @@
 @model CloseViewModel
+@using System.Globalization
 @{
     ViewData["Title"] = "Close";
     var monthLabel = new DateOnly(Model.Year, Model.Month, 1).ToString("MMMM yyyy");
+
+    // Grouping/summing for the breakdown bar — a small display-only aggregation, not a
+    // business calculation (that already happened in NetWorthService); kept here rather than
+    // in the controller per CLAUDE.md's "no calculation in a controller" rule.
+    var byLiquidity = Model.NetWorth.ByAccount
+        .GroupBy(a => a.LiquidityClass)
+        .ToDictionary(g => g.Key, g => g.Sum(a => a.BalanceMinor));
+    var holdingsMinor = Model.NetWorth.ByHolding.Sum(h => h.ValueMinor);
+    var cashMinor = byLiquidity.GetValueOrDefault(LiquidityClass.Immediate) + byLiquidity.GetValueOrDefault(LiquidityClass.ShortTerm);
+    var illiquidMinor = byLiquidity.GetValueOrDefault(LiquidityClass.Illiquid) + holdingsMinor;
+    var debtMinor = byLiquidity.GetValueOrDefault(LiquidityClass.Debt);
+    var totalMinor = Model.NetWorth.TotalMinor;
+
+    double Pct(long minor) => totalMinor == 0 ? 0 : (double)minor / totalMinor * 100;
+    string BarWidth(long minor) => Math.Max(0, Pct(minor)).ToString("0.##", CultureInfo.InvariantCulture);
+    string ChipPct(long minor) => Pct(minor).ToString("0", CultureInfo.InvariantCulture);
 }
 
 <div class="view">
     <div class="vhead">
         <div>
             <h1>@monthLabel</h1>
-            <p class="sub">v0.1 — figures below are computed from the database, not a mockup. Net worth, reconciliation, and the review queue aren't built yet.</p>
+            <p class="sub">v0.1 — figures below are computed from the database, not a mockup. Reconciliation and the review queue aren't built yet.</p>
         </div>
     </div>
 
-    <div class="card fig card-solo">
-        <div class="card-b">
-            <span class="lbl">Savings rate</span>
-            <div class="v num">@DisplayFormat.Percent1(Model.Flows.SavingsRate)<small>%</small></div>
-            <div class="d mut">@DisplayFormat.Aed(Model.Flows.NetMinor) kept of @DisplayFormat.Aed(Model.Flows.IncomeMinor) earned</div>
+    <div class="grid g2">
+        <div class="card fig">
+            <div class="card-b">
+                <span class="lbl">Net worth</span>
+                <div class="v num">@DisplayFormat.Aed(totalMinor)<small>AED</small></div>
+                <div class="bar" title="by liquidity">
+                    <i style="width:@(BarWidth(cashMinor))%;background:var(--blue)"></i>
+                    <i style="width:@(BarWidth(illiquidMinor))%;background:var(--in)"></i>
+                    <i style="width:@(BarWidth(debtMinor))%;background:var(--out)"></i>
+                </div>
+                <div class="flexg" style="margin-top:9px">
+                    <span class="chip blue">cash @(ChipPct(cashMinor))%</span>
+                    <span class="chip good">illiquid @(ChipPct(illiquidMinor))%</span>
+                    <span class="chip bad">debt @(ChipPct(debtMinor))%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card fig">
+            <div class="card-b">
+                <span class="lbl">Savings rate</span>
+                <div class="v num">@DisplayFormat.Percent1(Model.Flows.SavingsRate)<small>%</small></div>
+                <div class="d mut">@DisplayFormat.Aed(Model.Flows.NetMinor) kept of @DisplayFormat.Aed(Model.Flows.IncomeMinor) earned</div>
+            </div>
         </div>
     </div>
 
@@ -24,7 +60,7 @@
         <div class="card-h"><span class="lbl">Accounts</span></div>
         <table>
             <tbody>
-                @foreach (var account in Model.Balances)
+                @foreach (var account in Model.NetWorth.ByAccount)
                 {
                     <tr>
                         <td class="tname">
@@ -32,6 +68,16 @@
                             <div class="tsub">@DisplayFormat.EnumLabel(account.LiquidityClass)</div>
                         </td>
                         <td class="r num @(account.BalanceMinor < 0 ? "neg" : "")">@DisplayFormat.Aed(account.BalanceMinor)</td>
+                    </tr>
+                }
+                @foreach (var holding in Model.NetWorth.ByHolding)
+                {
+                    <tr>
+                        <td class="tname">
+                            @holding.AssetName
+                            <div class="tsub">@holding.AccountName · @holding.Quantity.ToString("0.####", CultureInfo.InvariantCulture) @DisplayFormat.EnumLabel(holding.Unit)</div>
+                        </td>
+                        <td class="r num">@DisplayFormat.Aed(holding.ValueMinor)</td>
                     </tr>
                 }
             </tbody>
