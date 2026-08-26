@@ -13,9 +13,9 @@ public class CloseController(MizanDbContext db) : Controller
         var monthEnd = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
 
         var flows = MonthlyFlowsService.GetFlows(db, year, month);
-        var balances = AccountBalanceService.GetBalances(db, monthEnd);
+        var netWorth = NetWorthService.GetNetWorthAt(db, monthEnd);
 
-        return View(new CloseViewModel(year, month, flows, balances));
+        return View(new CloseViewModel(year, month, flows, netWorth));
     }
 
     // The most recently complete calendar month — not a financial calculation, just "which

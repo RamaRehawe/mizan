@@ -61,12 +61,26 @@ h1 { font-size: 21px; font-weight: 600; letter-spacing: -.015em; margin: 0 0 3px
 }
 .card-b { padding: 14px; }
 .grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: 1fr 1fr; }
 .g3 { grid-template-columns: repeat(3, 1fr); }
 .card-solo { max-width: 320px; }
 
 .fig .v { font-family: var(--mono); font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.15; }
 .fig .v small { font-size: 13px; color: var(--ink3); font-weight: 400; margin-left: 3px; }
 .fig .d { font-family: var(--mono); font-size: 11.5px; margin-top: 5px; }
+
+.bar { height: 5px; background: var(--rule2); border-radius: 2px; overflow: hidden; margin-top: 11px; display: flex; }
+.bar i { display: block; height: 100%; }
+
+.flexg { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px;
+  background: var(--rule2); color: var(--ink2); white-space: nowrap;
+}
+.chip.blue { background: var(--blue-wash); color: var(--blue); }
+.chip.good { background: #E9F2ED; color: var(--in); }
+.chip.bad { background: #FAECE9; color: var(--out); }
 
 table { width: 100%; border-collapse: collapse; }
 th {
@@ -82,5 +96,5 @@ tbody tr:hover { background: #F7F9FA; }
 .tsub { font-size: 11.5px; color: var(--ink3); }
 
 @media (max-width: 1000px) {
-  .g3 { grid-template-columns: 1fr; }
+  .g2, .g3 { grid-template-columns: 1fr; }
 }
