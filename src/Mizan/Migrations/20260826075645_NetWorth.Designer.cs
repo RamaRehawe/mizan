@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mizan.Models;
 
@@ -10,9 +11,11 @@ using Mizan.Models;
 namespace Mizan.Migrations
 {
     [DbContext(typeof(MizanDbContext))]
-    partial class MizanDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260826075645_NetWorth")]
+    partial class NetWorth
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
